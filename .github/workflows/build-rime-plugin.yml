@@ -1,0 +1,81 @@
+name: build-rime-plugin
+
+on:
+  push:
+    branches:
+      - add-simplehttp
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: false
+
+    # Cache the prebuilt submodule by its commit hash to avoid re-downloading
+    # the large binary tree on every run.
+    - name: Get prebuilt submodule commit
+      id: prebuilt-commit
+      run: |
+        echo "sha=$(git ls-tree HEAD lib/fcitx5/src/main/cpp/prebuilt | awk '{print $3}')" >> $GITHUB_OUTPUT
+
+    - name: Cache prebuilt (arm64-v8a)
+      uses: actions/cache@v4
+      id: cache-prebuilt
+      with:
+        path: lib/fcitx5/src/main/cpp/prebuilt
+        key: prebuilt-arm64-v8a-${{ steps.prebuilt-commit.outputs.sha }}
+
+    - name: Init prebuilt submodule (sparse, arm64-v8a only)
+      if: steps.cache-prebuilt.outputs.cache-hit != 'true'
+      run: |
+        git submodule update --init --depth 1 --no-checkout \
+          lib/fcitx5/src/main/cpp/prebuilt
+        cd lib/fcitx5/src/main/cpp/prebuilt
+        git sparse-checkout init --cone
+        # Build sparse-checkout patterns: only include */arm64-v8a per top-level dir
+        patterns=$(git ls-tree --name-only HEAD | while read d; do
+          git ls-tree --name-only HEAD "$d" 2>/dev/null | grep -q "arm64-v8a" && echo "$d/arm64-v8a"
+        done)
+        git sparse-checkout set $patterns
+        git checkout
+
+    - name: Init source submodules
+      run: |
+        git submodule update --init --depth 1 \
+          lib/fcitx5/src/main/cpp/fcitx5 \
+          plugin/rime/src/main/cpp/fcitx5-rime \
+          plugin/rime/src/main/cpp/rime-prelude \
+          plugin/rime/src/main/cpp/rime-essay \
+          plugin/rime/src/main/cpp/rime-luna-pinyin \
+          plugin/rime/src/main/cpp/rime-stroke
+
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 11
+
+    - name: Install NDK and CMake
+      run: |
+        sdkmanager --install \
+          "ndk;28.0.13004108" \
+          "cmake;3.31.6" \
+          2>&1 | grep -v "^\[" | tail -5
+
+    - uses: gradle/actions/setup-gradle@v4
+
+    - name: Build RIME plugin debug APK (arm64-v8a)
+      env:
+        BUILD_ABI: arm64-v8a
+        NDK_VERSION: 28.0.13004108
+        CMAKE_VERSION: 3.31.6
+      run: ./gradlew :plugin:rime:assembleDebug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: rime-plugin-debug-arm64
+        path: plugin/rime/build/outputs/apk/debug/*.apk

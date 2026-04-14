@@ -10,6 +10,13 @@
 # Generated asset descriptor
 /plugin/*/src/main/assets/descriptor.json
 
+# Exception: simplehttp.so for cloud pinyin on Android
+!/plugin/rime/src/main/assets/usr/
+!/plugin/rime/src/main/assets/usr/share/
+!/plugin/rime/src/main/assets/usr/share/lua/
+!/plugin/rime/src/main/assets/usr/share/lua/5.4/
+!/plugin/rime/src/main/assets/usr/share/lua/5.4/simplehttp.so
+
 # Intellij
 .idea/*
 !.idea/codeStyles/
