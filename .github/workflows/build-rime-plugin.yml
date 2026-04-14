@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - uses: actions/checkout@v4
@@ -47,28 +47,29 @@ jobs:
         git submodule update --init --depth 1 plugin/rime/src/main/cpp/rime-luna-pinyin
         git submodule update --init --depth 1 plugin/rime/src/main/cpp/rime-stroke
 
-    - uses: actions/setup-java@v4
+    - name: Setup Java
+      uses: actions/setup-java@v5
       with:
         distribution: temurin
         java-version: 17
 
-    - name: Install build dependencies
-      run: sudo apt-get install -y extra-cmake-modules gettext
+    - name: Setup Android environment
+      uses: android-actions/setup-android@v3
 
-    - name: Install NDK and CMake
+    - name: Install CMake and NDK
+      run: sdkmanager --install "cmake;3.31.6" "ndk;28.0.13004108"
+
+    - name: Install system dependencies
       run: |
-        sdkmanager --install \
-          "ndk;28.0.13004108" \
-          "cmake;3.31.6" \
-          2>&1 | grep -v "^\[" | tail -5
+        sudo apt update
+        sudo apt install extra-cmake-modules gettext
 
-    - uses: gradle/actions/setup-gradle@v4
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v5
 
     - name: Build RIME plugin debug APK (arm64-v8a)
       env:
         BUILD_ABI: arm64-v8a
-        NDK_VERSION: 28.0.13004108
-        CMAKE_VERSION: 3.31.6
       run: ./gradlew :plugin:rime:assembleDebug
 
     - name: Upload APK
