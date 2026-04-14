@@ -29,29 +29,23 @@ jobs:
         path: lib/fcitx5/src/main/cpp/prebuilt
         key: prebuilt-arm64-v8a-${{ steps.prebuilt-commit.outputs.sha }}
 
-    - name: Init prebuilt submodule (sparse, arm64-v8a only)
+    - name: Init prebuilt submodule (shallow, trim to arm64-v8a)
       if: steps.cache-prebuilt.outputs.cache-hit != 'true'
       run: |
-        git submodule update --init --depth 1 --no-checkout \
-          lib/fcitx5/src/main/cpp/prebuilt
+        git submodule update --init --depth 1 lib/fcitx5/src/main/cpp/prebuilt
         cd lib/fcitx5/src/main/cpp/prebuilt
-        git sparse-checkout init --cone
-        # Build sparse-checkout patterns: only include */arm64-v8a per top-level dir
-        patterns=$(git ls-tree --name-only HEAD | while read d; do
-          git ls-tree --name-only HEAD "$d" 2>/dev/null | grep -q "arm64-v8a" && echo "$d/arm64-v8a"
-        done)
-        git sparse-checkout set $patterns
-        git checkout
+        find . -mindepth 2 -maxdepth 2 -type d \
+          \( -name "armeabi-v7a" -o -name "x86" -o -name "x86_64" \) \
+          -exec rm -rf {} + 2>/dev/null || true
 
     - name: Init source submodules
       run: |
-        git submodule update --init --depth 1 \
-          lib/fcitx5/src/main/cpp/fcitx5 \
-          plugin/rime/src/main/cpp/fcitx5-rime \
-          plugin/rime/src/main/cpp/rime-prelude \
-          plugin/rime/src/main/cpp/rime-essay \
-          plugin/rime/src/main/cpp/rime-luna-pinyin \
-          plugin/rime/src/main/cpp/rime-stroke
+        git submodule update --init --depth 1 lib/fcitx5/src/main/cpp/fcitx5
+        git submodule update --init --depth 1 plugin/rime/src/main/cpp/fcitx5-rime
+        git submodule update --init --depth 1 plugin/rime/src/main/cpp/rime-prelude
+        git submodule update --init --depth 1 plugin/rime/src/main/cpp/rime-essay
+        git submodule update --init --depth 1 plugin/rime/src/main/cpp/rime-luna-pinyin
+        git submodule update --init --depth 1 plugin/rime/src/main/cpp/rime-stroke
 
     - uses: actions/setup-java@v4
       with:
