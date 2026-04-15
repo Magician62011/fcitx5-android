@@ -43,6 +43,9 @@ jobs:
     - name: Init source submodules
       run: |
         git submodule update --init --depth 1 lib/fcitx5/src/main/cpp/fcitx5
+        git submodule update --init --depth 1 lib/fcitx5-lua/src/main/cpp/fcitx5-lua
+        git submodule update --init --depth 1 lib/libime/src/main/cpp/libime
+        git submodule update --init --depth 1 lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons
 
     - name: Setup Java
       uses: actions/setup-java@v5
