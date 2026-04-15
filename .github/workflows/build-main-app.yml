@@ -1,0 +1,90 @@
+name: build-main-app
+
+on:
+  push:
+    branches:
+      - add-simplehttp
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: false
+
+    # Cache the prebuilt submodule by its commit hash to avoid re-downloading
+    # the large binary tree on every run.
+    - name: Get prebuilt submodule commit
+      id: prebuilt-commit
+      run: |
+        echo "sha=$(git ls-tree HEAD lib/fcitx5/src/main/cpp/prebuilt | awk '{print $3}')" >> $GITHUB_OUTPUT
+
+    - name: Cache prebuilt (arm64-v8a)
+      uses: actions/cache@v4
+      id: cache-prebuilt
+      with:
+        path: |
+          lib/fcitx5/src/main/cpp/prebuilt
+          .git/modules/lib/fcitx5/src/main/cpp/prebuilt
+        key: prebuilt-arm64-v8a-${{ steps.prebuilt-commit.outputs.sha }}
+
+    - name: Init prebuilt submodule (shallow, trim to arm64-v8a)
+      if: steps.cache-prebuilt.outputs.cache-hit != 'true'
+      run: |
+        git submodule update --init --depth 1 lib/fcitx5/src/main/cpp/prebuilt
+        cd lib/fcitx5/src/main/cpp/prebuilt
+        find . -mindepth 2 -maxdepth 2 -type d \
+          \( -name "armeabi-v7a" -o -name "x86" -o -name "x86_64" \) \
+          -exec rm -rf {} + 2>/dev/null || true
+
+    - name: Init source submodules
+      run: |
+        git submodule update --init --depth 1 lib/fcitx5/src/main/cpp/fcitx5
+
+    - name: Setup Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: 17
+
+    - name: Setup Android environment
+      uses: android-actions/setup-android@v3
+
+    - name: Install CMake and NDK
+      run: sdkmanager --install "cmake;3.31.6" "ndk;28.0.13004108"
+
+    - name: Install system dependencies
+      run: |
+        sudo apt update
+        sudo apt install extra-cmake-modules gettext
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v5
+
+    - name: Generate test signing key
+      run: |
+        keytool -genkeypair -v \
+          -keystore test.keystore \
+          -alias testkey \
+          -keyalg RSA -keysize 2048 \
+          -validity 3650 \
+          -storepass testpass \
+          -keypass testpass \
+          -dname "CN=Test"
+        echo "SIGN_KEY_BASE64=$(base64 -w 0 test.keystore)" >> $GITHUB_ENV
+
+    - name: Build main app release APK (arm64-v8a)
+      env:
+        BUILD_ABI: arm64-v8a
+        SIGN_KEY_PWD: testpass
+        SIGN_KEY_ALIAS: testkey
+      run: ./gradlew :app:assembleRelease
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: main-app-release-arm64
+        path: app/build/outputs/apk/release/*.apk
