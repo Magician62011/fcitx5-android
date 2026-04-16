@@ -2,8 +2,8 @@ name: build-rime-plugin
 
 on:
   push:
-    branches:
-      - add-simplehttp
+    tags:
+      - "v*"
   workflow_dispatch:
 
 jobs:

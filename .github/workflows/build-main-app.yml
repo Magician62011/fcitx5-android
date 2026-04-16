@@ -2,8 +2,8 @@ name: build-main-app
 
 on:
   push:
-    branches:
-      - add-simplehttp
+    tags:
+      - "v*"
   workflow_dispatch:
 
 jobs:
