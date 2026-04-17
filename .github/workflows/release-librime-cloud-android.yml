@@ -1,0 +1,150 @@
+name: release-librime-cloud-android
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  # Build simplehttp.so and iconv.so for Android arm64-v8a
+  build-so:
+    uses: zc0xb/librime-cloud/.github/workflows/build-android.yml@android-simplehttp
+
+  # Build main app APK (runs in parallel with build-so)
+  build-main-app:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        submodules: recursive
+
+    - name: Install system dependencies
+      run: |
+        sudo apt update
+        sudo apt install extra-cmake-modules gettext
+
+    - name: Setup Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: 17
+
+    - name: Setup Android environment
+      uses: android-actions/setup-android@v3
+      with:
+        packages: cmake;3.31.6
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v5
+
+    - name: Generate test signing key
+      run: |
+        keytool -genkeypair -v \
+          -keystore test.keystore \
+          -alias testkey \
+          -keyalg RSA -keysize 2048 \
+          -validity 3650 \
+          -storepass testpass \
+          -keypass testpass \
+          -dname "CN=Test"
+        echo "SIGN_KEY_BASE64=$(base64 -w 0 test.keystore)" >> $GITHUB_ENV
+
+    - name: Build main app release APK (arm64-v8a)
+      env:
+        BUILD_ABI: arm64-v8a
+        SIGN_KEY_PWD: testpass
+        SIGN_KEY_ALIAS: testkey
+      run: ./gradlew :app:assembleRelease
+
+    - name: Upload main app APK
+      uses: actions/upload-artifact@v5
+      with:
+        name: fcitx5-android-release
+        path: app/build/outputs/apk/release/*.apk
+
+  # Build plugin APK (depends on build-so)
+  build-plugin-apk:
+    needs: build-so
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        submodules: false
+
+    - name: Download .so artifacts
+      uses: actions/download-artifact@v5
+      with:
+        name: android-arm64-v8a
+        path: /tmp/so-artifact
+
+    - name: Install simplehttp.so and iconv.so into plugin assets
+      run: |
+        mkdir -p plugin/librime-cloud-android/src/main/assets/usr/share/lua/5.4
+        tar xf /tmp/so-artifact/android-arm64-v8a-lua5.4.tar.gz \
+            -C /tmp/so-artifact/
+        cp /tmp/so-artifact/out-android/simplehttp.so \
+            plugin/librime-cloud-android/src/main/assets/usr/share/lua/5.4/simplehttp.so
+        cp /tmp/so-artifact/out-android/iconv.so \
+            plugin/librime-cloud-android/src/main/assets/usr/share/lua/5.4/iconv.so
+
+    - name: Setup Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: 17
+
+    - name: Setup Android environment
+      uses: android-actions/setup-android@v3
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v5
+
+    - name: Generate test signing key
+      run: |
+        keytool -genkeypair -v \
+          -keystore test.keystore \
+          -alias testkey \
+          -keyalg RSA -keysize 2048 \
+          -validity 3650 \
+          -storepass testpass \
+          -keypass testpass \
+          -dname "CN=Test"
+        echo "SIGN_KEY_BASE64=$(base64 -w 0 test.keystore)" >> $GITHUB_ENV
+
+    - name: Build librime-cloud-android plugin release APK (arm64-v8a)
+      env:
+        BUILD_ABI: arm64-v8a
+        SIGN_KEY_PWD: testpass
+        SIGN_KEY_ALIAS: testkey
+      run: ./gradlew :plugin:librime-cloud-android:assembleRelease
+
+    - name: Upload plugin APK
+      uses: actions/upload-artifact@v5
+      with:
+        name: librime-cloud-android-release-arm64
+        path: plugin/librime-cloud-android/build/outputs/apk/release/*.apk
+
+  # Create GitHub Release
+  create-release:
+    needs: [build-main-app, build-plugin-apk]
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Download main app APK
+      uses: actions/download-artifact@v5
+      with:
+        name: fcitx5-android-release
+        path: /tmp/release
+
+    - name: Download plugin APK
+      uses: actions/download-artifact@v5
+      with:
+        name: librime-cloud-android-release-arm64
+        path: /tmp/release
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: /tmp/release/*.apk
