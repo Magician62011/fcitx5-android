@@ -1,0 +1,76 @@
+name: build-librime-cloud-android
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  # Build simplehttp.so and iconv.so for Android arm64-v8a
+  build-so:
+    uses: Magician62011/librime-cloud/.github/workflows/build-android.yml@android-simplehttp
+
+  build-apk:
+    needs: build-so
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: false
+
+    # Download simplehttp.so and iconv.so built by the build-so job
+    - name: Download .so artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: android-arm64-v8a
+        path: /tmp/so-artifact
+
+    - name: Install simplehttp.so and iconv.so into plugin assets
+      run: |
+        tar xf /tmp/so-artifact/android-arm64-v8a-lua5.4.tar.gz \
+            -C /tmp/so-artifact/
+        cp /tmp/so-artifact/out-android/simplehttp.so \
+            plugin/librime-cloud-android/src/main/assets/usr/share/lua/5.4/simplehttp.so
+        cp /tmp/so-artifact/out-android/iconv.so \
+            plugin/librime-cloud-android/src/main/assets/usr/share/lua/5.4/iconv.so
+        echo "simplehttp.so: $(wc -c < plugin/librime-cloud-android/src/main/assets/usr/share/lua/5.4/simplehttp.so) bytes"
+        echo "iconv.so:      $(wc -c < plugin/librime-cloud-android/src/main/assets/usr/share/lua/5.4/iconv.so) bytes"
+
+    - name: Setup Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: 17
+
+    - name: Setup Android environment
+      uses: android-actions/setup-android@v3
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v5
+
+    - name: Generate test signing key
+      run: |
+        keytool -genkeypair -v \
+          -keystore test.keystore \
+          -alias testkey \
+          -keyalg RSA -keysize 2048 \
+          -validity 3650 \
+          -storepass testpass \
+          -keypass testpass \
+          -dname "CN=Test"
+        echo "SIGN_KEY_BASE64=$(base64 -w 0 test.keystore)" >> $GITHUB_ENV
+
+    - name: Build librime-cloud-android plugin release APK (arm64-v8a)
+      env:
+        BUILD_ABI: arm64-v8a
+        SIGN_KEY_PWD: testpass
+        SIGN_KEY_ALIAS: testkey
+      run: ./gradlew :plugin:librime-cloud-android:assembleRelease
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: librime-cloud-android-release-arm64
+        path: plugin/librime-cloud-android/build/outputs/apk/release/*.apk

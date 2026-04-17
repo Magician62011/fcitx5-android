@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name_debug">小企鹅输入法 (中州韵云拼音插件 | 调试)</string>
+    <string name="app_name_release">小企鹅输入法 (中州韵云拼音插件)</string>
+    <string name="description">通过 Lua 为 RIME 提供云拼音支持</string>
+</resources>

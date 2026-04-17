@@ -1,0 +1,11 @@
+{
+    "uniqueId": "Magician62011/librime-cloud/iconv",
+    "artifactVersion": "0.1.0",
+    "description": "iconv Lua module for Android wrapping Bionic libc (based on hchunhui/librime-cloud)",
+    "name": "librime-cloud-android iconv",
+    "website": "https://github.com/Magician62011/librime-cloud",
+    "tag": "native",
+    "licenses": [
+        "MIT"
+    ]
+}
