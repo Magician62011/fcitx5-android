@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name_debug">小企鵝輸入法（中州韻雲拼音外掛程式 | 除錯模式）</string>
+    <string name="app_name_release">小企鵝輸入法（中州韻雲拼音外掛程式）</string>
+    <string name="description">透過 librime-lua 為 RIME 提供雲拼音支援</string>
+</resources>

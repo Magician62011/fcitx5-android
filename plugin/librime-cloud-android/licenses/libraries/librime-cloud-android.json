@@ -1,0 +1,11 @@
+{
+    "uniqueId": "zc0xb/librime-cloud-android",
+    "artifactVersion": "0.1.0",
+    "description": "Cloud Pinyin plugin for fcitx5-android via librime-cloud Lua modules",
+    "name": "zc0xb/librime-cloud-android",
+    "website": "https://github.com/zc0xb/librime-cloud",
+    "tag": "native",
+    "licenses": [
+        "MIT"
+    ]
+}
